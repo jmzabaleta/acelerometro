@@ -2,6 +2,8 @@
 
 Demo Flutter Web que usa el acelerometro del dispositivo para mover una bola en pantalla.
 
+En web, abre la pagina desde HTTPS y toca `Activar sensor` para que el navegador pida permiso de movimiento. Si el navegador no entrega eventos de movimiento, la bola tambien se puede mover arrastrandola en el area de juego.
+
 ## Desarrollo local
 
 ```bash

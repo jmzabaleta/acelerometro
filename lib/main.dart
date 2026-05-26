@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
+
+import 'motion_input.dart';
 
 void main() {
   runApp(const TiltBallApp());
@@ -36,24 +37,29 @@ class TiltBallPage extends StatefulWidget {
 }
 
 class _TiltBallPageState extends State<TiltBallPage> {
-  StreamSubscription<AccelerometerEvent>? _sub;
+  StreamSubscription<MotionSample>? _sub;
   double _ax = 0.0;
   double _ay = 0.0;
   double _alignX = 0.0;
   double _alignY = 0.0;
-  bool _sensorAvailable = true;
+  bool _sensorStarted = false;
 
   static const double _sensitivity = 0.12;
 
   @override
-  void initState() {
-    super.initState();
-    _sub = accelerometerEventStream().listen(
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  void _startListening() {
+    _sub?.cancel();
+    _sub = motionSamples().listen(
       (event) {
         if (!mounted) return;
 
         setState(() {
-          _sensorAvailable = true;
+          _sensorStarted = true;
           _ax = event.x;
           _ay = event.y;
           _alignX = (_ax * -_sensitivity).clamp(-1.0, 1.0);
@@ -64,18 +70,12 @@ class _TiltBallPageState extends State<TiltBallPage> {
         if (!mounted) return;
 
         setState(() {
-          _sensorAvailable = false;
+          _sensorStarted = false;
           _resetValues();
         });
       },
       cancelOnError: false,
     );
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
   }
 
   void _resetValues() {
@@ -87,6 +87,37 @@ class _TiltBallPageState extends State<TiltBallPage> {
 
   void _resetBall() {
     setState(_resetValues);
+  }
+
+  Future<void> _activateSensor() async {
+    final allowed = await requestMotionPermission();
+    if (!mounted) return;
+
+    setState(() {
+      _sensorStarted = allowed;
+    });
+
+    if (allowed) {
+      _startListening();
+    }
+  }
+
+  void _moveFromPointer(Offset localPosition, Size size) {
+    final width = size.width == 0 ? 1.0 : size.width;
+    final height = size.height == 0 ? 1.0 : size.height;
+    final x = ((localPosition.dx / width) * 2 - 1)
+        .clamp(-1.0, 1.0)
+        .toDouble();
+    final y = ((localPosition.dy / height) * 2 - 1)
+        .clamp(-1.0, 1.0)
+        .toDouble();
+
+    setState(() {
+      _alignX = x;
+      _alignY = y;
+      _ax = -x / _sensitivity;
+      _ay = y / _sensitivity;
+    });
   }
 
   @override
@@ -108,14 +139,14 @@ class _TiltBallPageState extends State<TiltBallPage> {
             children: [
               const SizedBox(height: 8),
               const Text(
-                'Inclina el celular para mover la bola',
+                'Activa el sensor e inclina el celular para mover la bola',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.white70),
               ),
               const SizedBox(height: 8),
-              if (!_sensorAvailable)
+              if (!_sensorStarted)
                 const Text(
-                  'El acelerometro no esta disponible en este navegador o dispositivo.',
+                  'En web debe abrirse con HTTPS y el navegador debe permitir movimiento. Tambien puedes arrastrar la bola para probar.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: Colors.orangeAccent),
                 ),
@@ -126,64 +157,74 @@ class _TiltBallPageState extends State<TiltBallPage> {
                     builder: (context, constraints) {
                       final zoneSize = constraints.biggest.shortestSide * 0.95;
 
-                      return Container(
-                        width: zoneSize,
-                        height: zoneSize,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF121417),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.6),
-                              offset: const Offset(0, 6),
-                              blurRadius: 20,
-                            ),
-                          ],
+                      return GestureDetector(
+                        onPanDown: (details) => _moveFromPointer(
+                          details.localPosition,
+                          Size.square(zoneSize),
                         ),
-                        child: Stack(
-                          children: [
-                            AnimatedAlign(
-                              alignment: Alignment(_alignX, _alignY),
-                              duration: const Duration(milliseconds: 120),
-                              curve: Curves.easeOutCubic,
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        accent.withOpacity(0.95),
-                                        Colors.white,
-                                      ],
-                                      stops: const [0.0, 1.0],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: accent.withOpacity(0.4),
-                                        blurRadius: 18,
-                                        spreadRadius: 1,
+                        onPanUpdate: (details) => _moveFromPointer(
+                          details.localPosition,
+                          Size.square(zoneSize),
+                        ),
+                        child: Container(
+                          width: zoneSize,
+                          height: zoneSize,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF121417),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.6),
+                                offset: const Offset(0, 6),
+                                blurRadius: 20,
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              AnimatedAlign(
+                                alignment: Alignment(_alignX, _alignY),
+                                duration: const Duration(milliseconds: 120),
+                                curve: Curves.easeOutCubic,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          accent.withOpacity(0.95),
+                                          Colors.white,
+                                        ],
+                                        stops: const [0.0, 1.0],
                                       ),
-                                    ],
-                                  ),
-                                  child: const SizedBox(width: 48, height: 48),
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: IgnorePointer(
-                                child: Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white12,
-                                    shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: accent.withOpacity(0.4),
+                                          blurRadius: 18,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const SizedBox(width: 48, height: 48),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                              Center(
+                                child: IgnorePointer(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white12,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -217,6 +258,16 @@ class _TiltBallPageState extends State<TiltBallPage> {
                     label: const Text('Reiniciar'),
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: _activateSensor,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _sensorStarted ? Colors.white12 : accent,
+                  foregroundColor: _sensorStarted ? Colors.white : Colors.black,
+                ),
+                icon: Icon(_sensorStarted ? Icons.sensors : Icons.touch_app),
+                label: Text(_sensorStarted ? 'Sensor activo' : 'Activar sensor'),
               ),
               const SizedBox(height: 16),
               Container(

@@ -7,7 +7,11 @@ void main() {
     await tester.pumpWidget(const TiltBallApp());
 
     expect(find.text('Tilt Ball - Demo Acelerometro'), findsOneWidget);
-    expect(find.text('Inclina el celular para mover la bola'), findsOneWidget);
+    expect(
+      find.text('Activa el sensor e inclina el celular para mover la bola'),
+      findsOneWidget,
+    );
     expect(find.text('Reiniciar'), findsOneWidget);
+    expect(find.text('Activar sensor'), findsOneWidget);
   });
 }

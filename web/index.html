@@ -31,6 +31,63 @@
 
   <title>acelerometro</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    window.tiltBallMotion = (() => {
+      let started = false;
+
+      const emitError = (message) => {
+        window.dispatchEvent(new CustomEvent('tilt-ball-motion-error', {
+          detail: String(message || 'Motion sensor unavailable'),
+        }));
+      };
+
+      const emitMotion = (event) => {
+        const acceleration = event.accelerationIncludingGravity || event.acceleration;
+
+        if (!acceleration) {
+          return;
+        }
+
+        window.dispatchEvent(new CustomEvent('tilt-ball-motion', {
+          detail: {
+            x: Number(acceleration.x || 0),
+            y: Number(acceleration.y || 0),
+            z: Number(acceleration.z || 0),
+          },
+        }));
+      };
+
+      const start = async () => {
+        if (!('DeviceMotionEvent' in window)) {
+          emitError('DeviceMotionEvent is not supported by this browser.');
+          return false;
+        }
+
+        try {
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await DeviceMotionEvent.requestPermission();
+
+            if (permission !== 'granted') {
+              emitError('Motion permission was not granted.');
+              return false;
+            }
+          }
+
+          if (!started) {
+            window.addEventListener('devicemotion', emitMotion, true);
+            started = true;
+          }
+
+          return true;
+        } catch (error) {
+          emitError(error);
+          return false;
+        }
+      };
+
+      return { start };
+    })();
+  </script>
 </head>
 <body>
   <!--
