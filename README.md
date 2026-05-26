@@ -1,17 +1,29 @@
 # acelerometro
 
-A new Flutter project.
+Demo Flutter Web que usa el acelerometro del dispositivo para mover una bola en pantalla.
 
-## Getting Started
+## Desarrollo local
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run -d chrome
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Build web
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter build web --release --base-href /
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+La salida queda en `build/web`.
+
+## Despliegue en Netlify
+
+Este proyecto ya incluye `netlify.toml` y `scripts/netlify-build.sh`.
+
+Configuracion esperada en Netlify:
+
+- Build command: `bash scripts/netlify-build.sh`
+- Publish directory: `build/web`
+
+El script instala Flutter estable en el entorno de Netlify cuando no esta disponible, descarga dependencias y genera el build web de produccion.
